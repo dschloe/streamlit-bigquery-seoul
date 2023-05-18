@@ -1,29 +1,44 @@
 # streamlit_app.py
 
 import streamlit as st
-from google.oauth2 import service_account
 from google.cloud import bigquery
+import seaborn as sns
+import pandas as pd
+import pandas_gbq
 
-# Create API client.
-credentials = service_account.Credentials.from_service_account_info(
-    # Very Important Point
-    st.secrets["gcp_service_account"]
-)
+
+from utils import credentials, SERVICE_KEY
 client = bigquery.Client(credentials=credentials)
 
 # Perform query.
 # Uses st.experimental_memo to only rerun when the query changes or after 10 min.
 @st.cache_data(ttl=600)
-def run_query(query):
-    query_job = client.query(query)
-    rows_raw = query_job.result()
-    # Convert to list of dicts. Required for st.experimental_memo to hash the return value.
-    rows = [dict(row) for row in rows_raw]
-    return rows
+def run_query(cols, name):
+    st.write("Load DataFrame")
+    sql = f"SELECT {cols} FROM streamlit-dashboard-369600.seoul.{name}"
+    df = client.query(sql).to_dataframe()
 
-rows = run_query("SELECT word FROM `bigquery-public-data.samples.shakespeare` LIMIT 10")
+    st.dataframe(df)
 
-# Print results.
-st.write("Some wise words from Shakespeare:")
-for row in rows:
-    st.write("✍️ " + row['word'])
+def main():
+    tableNames = st.selectbox("테이블 선택", ("realestate", "iris"))
+    if tableNames == "iris":
+        run_query(cols="*", name="iris")
+    else:
+        sql = """
+        SELECT STRING_AGG(column_name)
+        FROM `streamlit-dashboard-369600.seoul.INFORMATION_SCHEMA.COLUMNS`
+        where table_name = 'realestate'
+        group by table_name
+        """
+
+        df = client.query(sql).to_dataframe()
+        all_cols = df.values[0][0].split(",")
+        columns = st.multiselect("컬럼명 선택", all_cols, default=all_cols)
+        temp_Strings = ", ".join(columns)
+        run_query(temp_Strings, tableNames)
+
+if __name__ == "__main__":
+    main()
+
+
