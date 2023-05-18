@@ -15,7 +15,9 @@ streamlit
 geopandas
 folium
 xmltodict
+
 streamlit-option-menu
 millify
 pingouin
 jupyterlab
+pandas-gbq
